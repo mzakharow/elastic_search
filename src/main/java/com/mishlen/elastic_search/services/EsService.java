@@ -17,11 +17,12 @@ import org.elasticsearch.xcontent.XContentType;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectWriter;
 
-import java.io.IOException;
+import java.io.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 @Service
 public class EsService {
@@ -50,17 +51,15 @@ public class EsService {
         log.setLevel(requestObject.getLevel());
         log.setValue(requestObject.getValue());
         log.setDate(Instant.ofEpochMilli(requestObject.getDate()).toString());
-
 //        log.setDate(LocalDateTime.ofInstant(Instant.ofEpochMilli(requestObject.getDate()), ZoneId.systemDefault()));
 
         IndexRequest indexRequest = new IndexRequest(INDEX_NAME);
         indexRequest.id(id);
         indexRequest.source(mapper.writeValueAsString(log), XContentType.JSON);
-
         esClient.index(indexRequest, RequestOptions.DEFAULT);
     }
 
-    public String search(LogSearchDTO logSearchDTO) throws Exception {
+    public String search(LogSearchDTO logSearchDTO, boolean zip) throws Exception {
 
         SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
@@ -68,8 +67,8 @@ public class EsService {
         QueryBuilder test = QueryBuilders
                 .boolQuery()
                 .filter(QueryBuilders.termQuery("application", logSearchDTO.getApplication()))
-                .filter(QueryBuilders.termQuery("env", logSearchDTO.getEnv()))
-                .filter(QueryBuilders.termQuery("level", logSearchDTO.getLevel()))
+                .filter(QueryBuilders.wildcardQuery("env", logSearchDTO.getEnv()))
+                .filter(QueryBuilders.wildcardQuery("level", logSearchDTO.getLevel()))
                 .must(QueryBuilders.rangeQuery("date").gte(logSearchDTO.getBeginDate()))
                 .must(QueryBuilders.rangeQuery("date").lte(logSearchDTO.getEndDate()));
         searchSourceBuilder.query(test);
@@ -91,6 +90,23 @@ public class EsService {
         }
 
         ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
-        return objectWriter.writeValueAsString(logs);
+        String jsonLogs = objectWriter.writeValueAsString(logs);
+
+        if (zip) {
+            return pushToCloud(jsonLogs);
+        } else {
+            return jsonLogs;
+        }
+    }
+
+    private String pushToCloud(String jsonLogs) throws IOException {
+        String name = "logs.json";
+        FileOutputStream fos = new FileOutputStream(name);
+        GZIPOutputStream gz = new GZIPOutputStream(fos);
+        ObjectOutputStream oos = new ObjectOutputStream(gz);
+        oos.writeObject(jsonLogs);
+        oos.close();
+        // TODO: тут архив надо куда то загрузить, и отдавать ссылку
+        return name;
     }
 }

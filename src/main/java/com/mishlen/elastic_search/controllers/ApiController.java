@@ -5,10 +5,7 @@ import com.mishlen.elastic_search.dto.LogSearchDTO;
 import com.mishlen.elastic_search.services.EsService;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
 import java.util.UUID;
-import java.util.zip.GZIPOutputStream;
 
 @RestController
 @RequestMapping("/api")
@@ -29,19 +26,6 @@ public class ApiController {
 
     @GetMapping("search")
     public String search(@RequestBody LogSearchDTO logSearchDTO, @RequestParam(value = "type", required = false, defaultValue = "false") Boolean zip) throws Exception {
-        String logs = esService.search(logSearchDTO);
-        if (zip) {
-            String name = "logs.gz";
-            FileOutputStream fos = new FileOutputStream(name);
-            GZIPOutputStream gz = new GZIPOutputStream(fos);
-            ObjectOutputStream oos = new ObjectOutputStream(gz);
-            oos.writeObject(logs);
-            oos.close();
-            // TODO: тут архив надо куда то загрузить, и отдавать ссылку
-            return name;
-
-        } else {
-            return logs;
-        }
+        return esService.search(logSearchDTO, zip);
     }
 }

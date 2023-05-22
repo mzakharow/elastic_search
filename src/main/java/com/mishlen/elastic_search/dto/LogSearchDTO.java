@@ -9,4 +9,5 @@ public class LogSearchDTO {
     private String env;
     private Long beginDate;
     private Long endDate;
+
 }
