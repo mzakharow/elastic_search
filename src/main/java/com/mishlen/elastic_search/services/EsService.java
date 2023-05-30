@@ -2,7 +2,7 @@ package com.mishlen.elastic_search.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mishlen.elastic_search.dto.LogRequestDTO;
-import com.mishlen.elastic_search.dto.LogSearchDTO;
+import com.mishlen.elastic_search.dto.SearchRequestDTO;
 import lombok.Data;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
 
 @Service
@@ -44,7 +45,7 @@ public class EsService {
 
     public EsService(RestHighLevelClient esClient) { this.esClient = esClient; }
 
-    public void updateLog(String id, LogRequestDTO requestObject) throws IOException {
+    public String updateLog(LogRequestDTO requestObject) throws IOException {
         Log log = new Log();
         log.setApplication(requestObject.getApplication());
         log.setEnv(requestObject.getEnv());
@@ -53,13 +54,16 @@ public class EsService {
         log.setDate(Instant.ofEpochMilli(requestObject.getDate()).toString());
 //        log.setDate(LocalDateTime.ofInstant(Instant.ofEpochMilli(requestObject.getDate()), ZoneId.systemDefault()));
 
+        String id = UUID.randomUUID().toString();
         IndexRequest indexRequest = new IndexRequest(INDEX_NAME);
         indexRequest.id(id);
         indexRequest.source(mapper.writeValueAsString(log), XContentType.JSON);
         esClient.index(indexRequest, RequestOptions.DEFAULT);
+
+        return id;
     }
 
-    public String search(LogSearchDTO logSearchDTO, boolean zip) throws Exception {
+    public String search(SearchRequestDTO logSearchDTO, boolean zip) throws Exception {
 
         SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();

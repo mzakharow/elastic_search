@@ -1,0 +1,8 @@
+package com.mishlen.elastic_search.dto;
+
+import lombok.Data;
+
+@Data
+public class SearchResponseLinkDTO extends SearchResponseDTO{
+    String link;
+}

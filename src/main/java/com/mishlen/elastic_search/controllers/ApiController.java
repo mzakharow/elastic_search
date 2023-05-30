@@ -1,11 +1,15 @@
 package com.mishlen.elastic_search.controllers;
 
 import com.mishlen.elastic_search.dto.LogRequestDTO;
-import com.mishlen.elastic_search.dto.LogSearchDTO;
+import com.mishlen.elastic_search.dto.LogResponseDTO;
+import com.mishlen.elastic_search.dto.SearchRequestDTO;
+import com.mishlen.elastic_search.dto.SearchResponseDTO;
 import com.mishlen.elastic_search.services.EsService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -18,14 +22,22 @@ public class ApiController {
     }
 
     @PutMapping("/logs")
-    public String addLog(@RequestBody LogRequestDTO requestObject) throws Exception {
-        String id = UUID.randomUUID().toString();
-        esService.updateLog(id, requestObject);
-        return id;
+    public ResponseEntity<LogResponseDTO> addLog(@RequestBody LogRequestDTO requestObject) throws Exception {
+        LogResponseDTO response = new LogResponseDTO(esService.updateLog(requestObject));
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @GetMapping("search")
-    public String search(@RequestBody LogSearchDTO logSearchDTO, @RequestParam(value = "type", required = false, defaultValue = "false") Boolean zip) throws Exception {
-        return esService.search(logSearchDTO, zip);
+    public String search(@RequestBody SearchRequestDTO searchRequestDTO, @RequestParam(value = "type", required = false, defaultValue = "false") Boolean zip) throws Exception {
+        return esService.search(searchRequestDTO, zip);
+    }
+
+    @RestControllerAdvice
+    public class CustomExceptionHandler {
+
+        @ExceptionHandler
+        public ResponseEntity<String> handle(Exception exception) {
+            return new ResponseEntity<>(exception.getMessage(), HttpStatus.I_AM_A_TEAPOT);
+        }
     }
 }
