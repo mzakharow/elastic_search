@@ -27,8 +27,9 @@ public class ApiController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @GetMapping("search")
-    public String search(@RequestBody SearchRequestDTO searchRequestDTO, @RequestParam(value = "type", required = false, defaultValue = "false") Boolean zip) throws Exception {
+    @GetMapping("/search")
+    public List<SearchResponseDTO> search(@RequestBody SearchRequestDTO searchRequestDTO, @RequestParam(value = "zip",
+            required = false, defaultValue = "false") Boolean zip) throws Exception {
         return esService.search(searchRequestDTO, zip);
     }
 

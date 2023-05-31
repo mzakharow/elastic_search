@@ -1,8 +1,7 @@
 package com.mishlen.elastic_search.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mishlen.elastic_search.dto.LogRequestDTO;
-import com.mishlen.elastic_search.dto.SearchRequestDTO;
+import com.mishlen.elastic_search.dto.*;
 import lombok.Data;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
@@ -63,7 +62,7 @@ public class EsService {
         return id;
     }
 
-    public String search(SearchRequestDTO logSearchDTO, boolean zip) throws Exception {
+    public List<SearchResponseDTO> search(SearchRequestDTO logSearchDTO, boolean zip) throws Exception {
 
         SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
@@ -79,27 +78,28 @@ public class EsService {
         searchRequest.source(searchSourceBuilder);
 
         SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
-        List<Log> logs = new ArrayList<>();
+        List<SearchResponseDTO> listResponse = new ArrayList<>();
         for (SearchHit hit : searchResponse.getHits().getHits()) {
             //indexId = hit.getId();
             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
 
-            Log log = new Log();
-            log.setApplication((String) sourceAsMap.get("application"));
-            log.setLevel((String) sourceAsMap.get("level"));
-            log.setEnv((String) sourceAsMap.get("env"));
-            log.setValue((String) sourceAsMap.get("value"));
-            log.setDate((String) sourceAsMap.get("date"));
-            logs.add(log);
+            SearchResponseFileDTO responseFile = new SearchResponseFileDTO();
+            responseFile.setApplication((String) sourceAsMap.get("application"));
+            responseFile.setLevel((String) sourceAsMap.get("level"));
+            responseFile.setEnv((String) sourceAsMap.get("env"));
+            responseFile.setValue((String) sourceAsMap.get("value"));
+            responseFile.setDate((String) sourceAsMap.get("date"));
+            listResponse.add(responseFile);
         }
 
-        ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
-        String jsonLogs = objectWriter.writeValueAsString(logs);
-
         if (zip) {
-            return pushToCloud(jsonLogs);
+            ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
+            String jsonLogs = objectWriter.writeValueAsString(listResponse);
+            List<SearchResponseDTO> link = new ArrayList<>();
+            link.add(new SearchResponseLinkDTO(pushToCloud(jsonLogs)));
+            return link;
         } else {
-            return jsonLogs;
+            return listResponse;
         }
     }
 
