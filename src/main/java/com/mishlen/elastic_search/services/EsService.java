@@ -8,6 +8,7 @@ import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
@@ -18,10 +19,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 
 import java.io.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
 @Service
@@ -37,8 +35,6 @@ public class EsService {
     }
 
     private final static String INDEX_NAME = "log";
-
-    private final ObjectMapper mapper = new ObjectMapper();
 
     private final RestHighLevelClient esClient;
 
@@ -56,6 +52,7 @@ public class EsService {
         String id = UUID.randomUUID().toString();
         IndexRequest indexRequest = new IndexRequest(INDEX_NAME);
         indexRequest.id(id);
+        ObjectMapper mapper = new ObjectMapper();
         indexRequest.source(mapper.writeValueAsString(log), XContentType.JSON);
         esClient.index(indexRequest, RequestOptions.DEFAULT);
 
@@ -79,6 +76,63 @@ public class EsService {
 
         SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
         List<SearchResponseDTO> listResponse = new ArrayList<>();
+        for (SearchHit hit : searchResponse.getHits().getHits()) {
+            //indexId = hit.getId();
+            Map<String, Object> sourceAsMap = hit.getSourceAsMap();
+
+            SearchResponseFileDTO responseFile = new SearchResponseFileDTO();
+            responseFile.setApplication((String) sourceAsMap.get("application"));
+            responseFile.setLevel((String) sourceAsMap.get("level"));
+            responseFile.setEnv((String) sourceAsMap.get("env"));
+            responseFile.setValue((String) sourceAsMap.get("value"));
+            responseFile.setDate((String) sourceAsMap.get("date"));
+            listResponse.add(responseFile);
+        }
+
+        if (zip) {
+            ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
+            String jsonLogs = objectWriter.writeValueAsString(listResponse);
+            List<SearchResponseDTO> link = new ArrayList<>();
+            link.add(new SearchResponseLinkDTO(pushToCloud(jsonLogs)));
+            return link;
+        } else {
+            return listResponse;
+        }
+    }
+
+    public List<SearchResponseDTO> msearch(RequestDTO logSearchDTO, boolean zip) throws Exception {
+
+        SearchRequest searchRequest = new SearchRequest(INDEX_NAME);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, String> map = new HashMap<>();
+
+        try {
+            map = mapper.readValue(logSearchDTO.getJson(), Map.class);
+            System.out.println(map);
+        }  catch (IOException ex) {
+            ex.printStackTrace();
+        }
+
+        BoolQueryBuilder query = QueryBuilders.boolQuery();
+        query.must(QueryBuilders.rangeQuery("date").gte(map.get("beginDate")).lte(map.get("endDate")).format("epoch_millis"));
+
+        for(Map.Entry entry: map.entrySet()) {
+            String key = entry.getKey().toString();
+            String value = entry.getValue().toString();
+
+            if (key != "beginDate" && key != "endDate") {
+                query.filter(QueryBuilders.termQuery(key, value));
+            }
+        }
+
+        searchSourceBuilder.query(query);
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = esClient.search(searchRequest, RequestOptions.DEFAULT);
+        List<SearchResponseDTO> listResponse = new ArrayList<>();
+
         for (SearchHit hit : searchResponse.getHits().getHits()) {
             //indexId = hit.getId();
             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
